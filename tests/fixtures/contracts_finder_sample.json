@@ -1,0 +1,53 @@
+{
+  "_note": "Synthetic OCDS releases in the Contracts Finder shape, for tests. Buyers and notices are fictional.",
+  "releases": [
+    {
+      "ocid": "ocds-b5fd17-1a2b3c4d-0001-4000-8000-000000000001",
+      "id": "ocds-b5fd17-1a2b3c4d-0001-4000-8000-000000000001-1",
+      "date": "2026-10-30T09:00:00Z",
+      "buyer": {"name": "Example Borough Council"},
+      "tender": {
+        "title": "Railway bridge parapet strengthening and culvert repairs",
+        "description": "Civil engineering works to a railway overbridge and associated drainage culvert.",
+        "value": {"amount": 420000, "currency": "GBP"},
+        "tenderPeriod": {"endDate": "2026-11-20T12:00:00Z"},
+        "classification": {"scheme": "CPV", "id": "45221111"}
+      }
+    },
+    {
+      "ocid": "ocds-b5fd17-1a2b3c4d-0002-4000-8000-000000000002",
+      "id": "ocds-b5fd17-1a2b3c4d-0002-4000-8000-000000000002-1",
+      "date": "2026-10-31T10:00:00Z",
+      "parties": [{"name": "Example Housing Trust", "roles": ["buyer"]}],
+      "tender": {
+        "title": "Fire door replacement and compartmentation surveys",
+        "description": "Replacement of flat entrance fire doors and fire stopping remedials across three blocks.",
+        "value": {"amount": 180000, "currency": "GBP"},
+        "items": [{"classification": {"scheme": "CPV", "id": "45421131"}}]
+      }
+    },
+    {
+      "ocid": "ocds-b5fd17-1a2b3c4d-0003-4000-8000-000000000003",
+      "id": "ocds-b5fd17-1a2b3c4d-0003-4000-8000-000000000003-1",
+      "date": "2026-11-01T08:30:00Z",
+      "buyer": {"name": "Example Transport Authority"},
+      "tender": {
+        "title": "Station catering and cleaning services",
+        "description": "Catering kiosks and cleaning services at five stations.",
+        "value": {"amount": 900000, "currency": "GBP"}
+      }
+    },
+    {
+      "ocid": "ocds-b5fd17-1a2b3c4d-0004-4000-8000-000000000004",
+      "id": "ocds-b5fd17-1a2b3c4d-0004-4000-8000-000000000004-1",
+      "date": "2026-11-02T14:00:00Z",
+      "buyer": {"name": "Example County Council"},
+      "tender": {
+        "title": "Countryside trail resurfacing",
+        "description": "Resurfacing of a walking trail and new guardrail along the canal.",
+        "value": {"amount": 60000, "currency": "GBP"}
+      }
+    }
+  ],
+  "links": {}
+}

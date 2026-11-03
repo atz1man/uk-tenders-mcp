@@ -1,0 +1,13 @@
+{"title": "Railway overbridge deck replacement", "description": "Civil engineering works to replace a bridge deck over the railway.", "value": 1200000, "cpv": ["45221111"], "expected": "GO"}
+{"title": "Culvert inspection and repair framework", "description": "Drainage culvert repairs on highway and railway embankment sites.", "value": 350000, "cpv": ["45232451"], "expected": "GO"}
+{"title": "Station platform resurfacing and tactile paving", "description": "Platform works at two railway stations.", "value": 240000, "cpv": [], "expected": "GO"}
+{"title": "Retaining wall repairs adjacent to the railway", "description": "Masonry retaining wall and drainage improvements.", "value": 90000, "cpv": ["45262500"], "expected": "GO"}
+{"title": "Footbridge painting at a rural station", "description": "Repainting of a station footbridge.", "value": 40000, "cpv": [], "expected": "MAYBE"}
+{"title": "Drainage survey of council car parks", "description": "CCTV drainage survey.", "value": 30000, "cpv": [], "expected": "MAYBE"}
+{"title": "Bridge assessment services", "description": "Structural assessments of highway bridges.", "value": null, "cpv": ["71311000"], "expected": "MAYBE"}
+{"title": "Rolling stock maintenance support", "description": "Maintenance of rail rolling stock fleet.", "value": 4000000, "cpv": [], "expected": "NO-GO"}
+{"title": "Station cleaning services", "description": "Cleaning services at railway stations.", "value": 600000, "cpv": [], "expected": "NO-GO"}
+{"title": "Countryside trail improvements", "description": "New guardrail and trail resurfacing.", "value": 70000, "cpv": [], "expected": "NO-GO"}
+{"title": "Ticketing system software licence", "description": "Software licence for a railway ticketing system.", "value": 800000, "cpv": [], "expected": "NO-GO"}
+{"title": "Office furniture supply", "description": "Desks and chairs for a council office.", "value": 50000, "cpv": [], "expected": "NO-GO"}
+{"title": "Candidate assessment services", "description": "Online assessment platform for recruitment campaigns.", "value": 100000, "cpv": [], "expected": "NO-GO", "note": "Live false positive, 3 Nov 2026: 'platform' matched a software platform."}
