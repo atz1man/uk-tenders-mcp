@@ -32,7 +32,8 @@ def main() -> int:
     misses = []
     for i, row in enumerate(rows, 1):
         t = Tender(ocid=f"eval-{i}", title=row["title"], description=row["description"],
-                   value_gbp=row["value"], cpv_codes=row["cpv"], source_url="eval")
+                   value_gbp=row["value"], cpv_codes=row["cpv"], category=row.get("category"), sme_suitable=row.get("sme"),
+                   source_url="eval")
         got = score_tender(t, profile).verdict
         confusion[(row["expected"], got)] += 1
         if got != row["expected"]:

@@ -1,40 +1,52 @@
 """MCP server: read-only tools over UK public tenders and Companies House.
 
 Tool design choices:
-- Task-shaped tools ("score recent tenders for this profile"), not raw table access.
-- Read-only, capped and paginated, so one call cannot flood the model's context.
-- Every result carries source_url; 'found: false' is a valid answer.
+- Task-shaped tools ("score this week's tenders for this profile"), not raw table access.
+- Read-only, capped and compact, so one call cannot flood the model's context.
+- Every result carries source_url and says which sources answered; 'found: false' is a valid answer.
+- Fetches are cached briefly, so a search followed by a score does not hit the APIs twice.
 """
 
 from __future__ import annotations
 
 import os
-from typing import Any
+import re
+import time
+from datetime import datetime, timezone
+from typing import Any, Literal
 
 import httpx
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
+from .models import Tender
 from .scoring import PROFILES, score_tender
-from .sources import SourceError, fetch_company, fetch_recent_tenders, normalise_company_number
+from .sources import (CONTRACTS_FINDER, FIND_A_TENDER, FetchResult, SourceError, fetch_company,
+                      fetch_tenders, normalise_company_number)
 
 server = MCPServer(
     name="uk-tenders",
     instructions=(
-        "Read-only tools over UK public procurement notices (Contracts Finder) and Companies House. "
-        "Every result has a source_url: cite it. If a tool returns found=false or an error, say so; "
+        "Read-only tools over UK public procurement notices (Find a Tender and Contracts Finder) and "
+        "Companies House. Every result has a source_url: cite it. Results say which sources answered; if "
+        "one failed, say the list may be incomplete. If a tool returns found=false or an error, say so; "
         "never fill gaps from memory."
     ),
 )
 
 READ_ONLY = ToolAnnotations(read_only_hint=True, open_world_hint=True)
+SOURCES = {"all": (FIND_A_TENDER, CONTRACTS_FINDER), "find_a_tender": (FIND_A_TENDER,),
+           "contracts_finder": (CONTRACTS_FINDER,)}
+CACHE_SECONDS = 600
+
 _client: httpx.AsyncClient | None = None
+_cache: dict[tuple[int, tuple[str, ...]], tuple[float, FetchResult]] = {}
 
 
 def client() -> httpx.AsyncClient:
     global _client
     if _client is None:
-        _client = httpx.AsyncClient(headers={"User-Agent": "uk-tenders-mcp/0.1"})
+        _client = httpx.AsyncClient(headers={"User-Agent": "uk-tenders-mcp/0.2"})
     return _client
 
 
@@ -42,59 +54,112 @@ def _clamp(value: int, low: int, high: int) -> int:
     return max(low, min(high, int(value)))
 
 
-@server.tool(annotations=READ_ONLY)
-async def search_tenders(days: int = 7, keywords: list[str] | None = None, limit: int = 20) -> dict[str, Any]:
-    """Find open UK public-sector tenders published on Contracts Finder in the last `days` days (1-30).
+async def _load(days: int, source: str) -> FetchResult:
+    key = (days, SOURCES[source])
+    hit = _cache.get(key)
+    if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
+        return hit[1]
+    result = await fetch_tenders(client(), days=days, sources=SOURCES[source])
+    if any(s.ok for s in result.sources.values()):
+        _cache[key] = (time.monotonic(), result)
+    return result
 
-    Use when the user asks what tenders are out, optionally filtered by keywords (any match, in title
-    or description). Returns at most `limit` (1-50) tenders, newest first, each with a source_url to cite.
+
+def _in_region(tender: Tender, wanted: list[str] | None) -> bool:
+    """Match any wanted region against every region the buyer ticked. A notice with no region is kept
+    out of a region-filtered search rather than guessed in."""
+    if not wanted:
+        return True
+    have = [r.lower() for r in tender.regions] or ([tender.region.lower()] if tender.region else [])
+    return any(w.lower().strip() in r for w in wanted for r in have)
+
+
+def _sources_block(result: FetchResult) -> dict[str, Any]:
+    return {name: status.as_dict() for name, status in result.sources.items()}
+
+
+@server.tool(annotations=READ_ONLY)
+async def search_tenders(
+    days: int = 7,
+    keywords: list[str] | None = None,
+    regions: list[str] | None = None,
+    source: Literal["all", "find_a_tender", "contracts_finder"] = "all",
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Find open UK public-sector tenders published or updated in the last `days` days (1-30).
+
+    Searches Find a Tender and Contracts Finder together, removes notices listed on both, and drops
+    tenders whose deadline has passed. Optional filters: keywords (any match in title or description)
+    and regions (for example ["London", "South East"]). Returns at most `limit` (1-50), soonest
+    deadline first, each with buyer, value, deadline, days_left and a source_url to cite.
     """
     days, limit = _clamp(days, 1, 30), _clamp(limit, 1, 50)
-    try:
-        tenders = await fetch_recent_tenders(client(), days=days)
-    except SourceError as exc:
-        return {"found": False, "error": str(exc)}
+    if source not in SOURCES:
+        return {"found": False, "error": f"source must be one of {list(SOURCES)}"}
+    result = await _load(days, source)
+    if not any(s.ok for s in result.sources.values()):
+        return {"found": False, "error": "No tender source answered.", "sources": _sources_block(result)}
+
+    tenders = [t for t in result.tenders if _in_region(t, regions)]
     if keywords:
-        terms = [k.lower() for k in keywords if k.strip()]
-        tenders = [t for t in tenders if any(k in f"{t.title} {t.description}".lower() for k in terms)]
-    tenders.sort(key=lambda t: t.published or "", reverse=True)
+        # Whole words, as in scoring: 'rail' must not match 'trail' or 'guardrail'.
+        patterns = [re.compile(rf"(?<![a-z]){re.escape(k.lower().strip())}(?![a-z])") for k in keywords if k.strip()]
+        tenders = [t for t in tenders if any(p.search(f"{t.title} {t.description}".lower()) for p in patterns)]
+    tenders.sort(key=lambda t: (t.deadline is None, t.deadline or ""))
+    now = datetime.now(timezone.utc)
     return {
         "found": bool(tenders),
         "count": len(tenders),
         "returned": min(len(tenders), limit),
-        "tenders": [t.model_dump() for t in tenders[:limit]],
+        "sources": _sources_block(result),
+        "tenders": [t.listing(now) for t in tenders[:limit]],
     }
 
 
 @server.tool(annotations=READ_ONLY)
 async def list_profiles() -> dict[str, Any]:
     """List the bid profiles that score_tenders can use, with what each one covers."""
-    return {"profiles": [{"name": p.name, "description": p.description} for p in PROFILES.values()]}
+    return {"profiles": [{"name": p.name, "description": p.description,
+                          "value_range_gbp": [p.min_value, p.max_value]} for p in PROFILES.values()]}
 
 
 @server.tool(annotations=READ_ONLY)
-async def score_tenders(profile: str = "rail_civils", days: int = 7, limit: int = 20) -> dict[str, Any]:
-    """Score recent tenders GO / MAYBE / NO-GO against a bid profile, with the reasons for each score.
+async def score_tenders(
+    profile: str = "rail_civils",
+    days: int = 7,
+    regions: list[str] | None = None,
+    include_no_go: bool = False,
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Score this week's open tenders GO / MAYBE / NO-GO against a bid profile, with reasons.
 
     Use when the user asks which tenders are worth bidding for. Call list_profiles for valid names.
-    Returns GO and MAYBE first, at most `limit` (1-50), each with reasons and a source_url.
+    Searches Find a Tender and Contracts Finder. Returns GO then MAYBE, highest score first, at most
+    `limit` (1-50), each with buyer, value, deadline, days_left, reasons and a source_url. NO-GO
+    results are counted but left out unless include_no_go is true.
     """
     chosen = PROFILES.get(profile)
     if chosen is None:
         return {"found": False, "error": f"Unknown profile '{profile}'", "profiles": list(PROFILES)}
     days, limit = _clamp(days, 1, 30), _clamp(limit, 1, 50)
-    try:
-        tenders = await fetch_recent_tenders(client(), days=days)
-    except SourceError as exc:
-        return {"found": False, "error": str(exc)}
+    result = await _load(days, "all")
+    if not any(s.ok for s in result.sources.values()):
+        return {"found": False, "error": "No tender source answered.", "sources": _sources_block(result)}
+
+    now = datetime.now(timezone.utc)
+    tenders = [t for t in result.tenders if _in_region(t, regions)]
     order = {"GO": 0, "MAYBE": 1, "NO-GO": 2}
-    verdicts = sorted((score_tender(t, chosen) for t in tenders), key=lambda v: (order[v.verdict], -v.score))
+    verdicts = sorted((score_tender(t, chosen, now) for t in tenders),
+                      key=lambda v: (order[v.verdict], -v.score, v.deadline or "9999"))
     summary = {k: sum(1 for v in verdicts if v.verdict == k) for k in order}
+    shown = verdicts if include_no_go else [v for v in verdicts if v.verdict != "NO-GO"]
     return {
         "found": bool(verdicts),
         "profile": chosen.name,
+        "scored": len(verdicts),
         "summary": summary,
-        "results": [v.model_dump() for v in verdicts[:limit]],
+        "sources": _sources_block(result),
+        "results": [v.model_dump() for v in shown[:limit]],
     }
 
 

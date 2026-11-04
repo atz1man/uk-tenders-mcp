@@ -1,7 +1,7 @@
 [project]
 name = "uk-tenders-mcp"
-version = "0.1.0"
-description = "Read-only MCP tools over UK public tenders (Contracts Finder) and Companies House, with explainable bid scoring."
+version = "0.2.0"
+description = "Read-only MCP tools over UK public tenders (Find a Tender and Contracts Finder) and Companies House, with explainable bid scoring."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

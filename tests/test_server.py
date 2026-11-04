@@ -29,7 +29,7 @@ def test_limits_are_clamped(mock_http):
 def test_score_orders_go_first(mock_http):
     result = run(server.score_tenders(profile="rail_civils"))
     assert result["results"][0]["verdict"] == "GO"
-    assert result["summary"]["GO"] == 1
+    assert result["summary"]["GO"] == 2  # the bridge (on both sites, counted once) and the foul water job
 
 
 def test_unknown_profile_lists_valid_ones(mock_http):

@@ -15,7 +15,7 @@ def test_parse_release_keeps_source_and_fields(cf_payload):
     assert t.buyer == "Example Borough Council"
     assert t.value_gbp == 420000
     assert t.cpv_codes == ["45221111"]
-    assert t.deadline == "2026-11-20T12:00:00Z"
+    assert t.deadline == "2099-11-20T12:00:00Z"
     assert t.source_url.endswith("/Notice/1a2b3c4d-0001-4000-8000-000000000001")
 
 

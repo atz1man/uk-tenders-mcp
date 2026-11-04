@@ -1,0 +1,81 @@
+{
+  "_note": "Synthetic OCDS releases in the Find a Tender shape, for tests. Buyers and notices are fictional.",
+  "releases": [
+    {
+      "ocid": "ocds-h6vhtk-000001", "id": "000101-2026", "date": "2026-11-03T09:00:00Z", "tag": ["tender"],
+      "buyer": {"name": "Example Water Ltd"},
+      "parties": [{"name": "Example Water Ltd", "roles": ["buyer"], "address": {"region": "UKJ28"}}],
+      "tender": {
+        "title": "Foul water drainage and culvert renewal", "status": "active",
+        "description": "Civil engineering works: foul water drainage, culvert renewal and headwall repairs.",
+        "mainProcurementCategory": "works",
+        "value": {"amountGross": 900000, "amount": 750000, "currency": "GBP"},
+        "tenderPeriod": {"endDate": "2099-12-01T12:00:00Z"},
+        "items": [{"id": "1", "additionalClassifications": [{"scheme": "CPV", "id": "45232451"}],
+                   "deliveryAddresses": [{"region": "UKJ"}]}],
+        "lots": [{"id": "1", "suitability": {"sme": true}}]
+      }
+    },
+    {
+      "ocid": "ocds-h6vhtk-000001", "id": "000150-2026", "date": "2026-11-04T09:00:00Z", "tag": ["tenderUpdate"],
+      "buyer": {"name": "Example Water Ltd"},
+      "tender": {
+        "title": "Foul water drainage and culvert renewal", "status": "active",
+        "description": "Civil engineering works: foul water drainage, culvert renewal and headwall repairs. Deadline extended.",
+        "mainProcurementCategory": "works",
+        "value": {"amount": 750000, "currency": "GBP"},
+        "tenderPeriod": {"endDate": "2099-12-08T12:00:00Z"},
+        "items": [{"id": "1", "additionalClassifications": [{"scheme": "CPV", "id": "45232451"}],
+                   "deliveryAddresses": [{"region": "UKJ"}]}],
+        "lots": [{"id": "1", "suitability": {"sme": true}}]
+      }
+    },
+    {
+      "ocid": "ocds-h6vhtk-000002", "id": "000102-2026", "date": "2026-11-03T10:00:00Z", "tag": ["tender"],
+      "buyer": {"name": "Example Borough Council"},
+      "tender": {
+        "title": "Railway bridge parapet strengthening and culvert repairs", "status": "active",
+        "description": "Civil engineering works to a railway overbridge and associated drainage culvert.",
+        "mainProcurementCategory": "works",
+        "value": {"amount": 420000, "currency": "GBP"},
+        "tenderPeriod": {"endDate": "2099-11-20T12:00:00Z"},
+        "items": [{"id": "1", "additionalClassifications": [{"scheme": "CPV", "id": "45221111"}],
+                   "deliveryAddresses": [{"region": "UKI"}]}]
+      }
+    },
+    {
+      "ocid": "ocds-h6vhtk-000003", "id": "000103-2026", "date": "2026-11-03T11:00:00Z", "tag": ["award", "contract"],
+      "buyer": {"name": "Example Council"},
+      "tender": {"title": "Awarded: resurfacing works", "status": "complete"}
+    },
+    {
+      "ocid": "ocds-h6vhtk-000004", "id": "000104-2026", "date": "2026-11-02T11:00:00Z", "tag": ["tender"],
+      "buyer": {"name": "Example Rail Ltd"},
+      "tender": {"title": "Railway embankment stabilisation", "status": "active",
+                 "description": "Earthworks to a railway embankment.", "mainProcurementCategory": "works",
+                 "tenderPeriod": {"endDate": "2099-12-01T12:00:00Z"}}
+    },
+    {
+      "ocid": "ocds-h6vhtk-000004", "id": "000160-2026", "date": "2026-11-04T11:00:00Z", "tag": ["tenderCancellation"],
+      "buyer": {"name": "Example Rail Ltd"},
+      "tender": {"title": "Railway embankment stabilisation", "status": "cancelled"}
+    },
+    {
+      "ocid": "ocds-h6vhtk-000005", "id": "000105-2026", "date": "2026-10-01T11:00:00Z", "tag": ["tender"],
+      "buyer": {"name": "Example Council"},
+      "tender": {"title": "Drainage repairs (closed)", "status": "active",
+                 "description": "Highway drainage repairs.", "mainProcurementCategory": "works",
+                 "tenderPeriod": {"endDate": "2020-01-01T12:00:00Z"}}
+    },
+    {
+      "ocid": "ocds-h6vhtk-000006", "id": "000106-2026", "date": "2026-11-03T12:00:00Z", "tag": ["tender"],
+      "buyer": {"name": "Example Train Operator"},
+      "tender": {"title": "Rail performance and incident management system", "status": "active",
+                 "description": "Software, hosting and data migration for a rail operator.",
+                 "mainProcurementCategory": "services", "value": {"amount": 1900000, "currency": "GBP"},
+                 "tenderPeriod": {"endDate": "2099-12-01T12:00:00Z"},
+                 "items": [{"id": "1", "additionalClassifications": [{"scheme": "CPV", "id": "48000000"}],
+                            "deliveryAddresses": [{"region": "UKH"}]}]}
+    }
+  ]
+}

@@ -10,7 +10,7 @@
         "title": "Railway bridge parapet strengthening and culvert repairs",
         "description": "Civil engineering works to a railway overbridge and associated drainage culvert.",
         "value": {"amount": 420000, "currency": "GBP"},
-        "tenderPeriod": {"endDate": "2026-11-20T12:00:00Z"},
+        "tenderPeriod": {"endDate": "2099-11-20T12:00:00Z"},
         "classification": {"scheme": "CPV", "id": "45221111"}
       }
     },
