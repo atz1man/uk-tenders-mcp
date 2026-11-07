@@ -40,6 +40,9 @@ def mock_http(monkeypatch, cf_payload, fts_payload):
         if host == "www.find-tender.service.gov.uk":
             if state.get("fts_down"):
                 return httpx.Response(403)
+            state["fts_calls"] = state.get("fts_calls", 0) + 1
+            if state.get("fts_flaky") and state["fts_calls"] % 2 == 0:
+                return httpx.Response(403)  # every other day-slice fails
             return httpx.Response(200, json=fts_payload)  # every day-slice gets the same page; dedupe handles it
         if host == "api.company-information.service.gov.uk":
             if path.endswith("/01234567"):

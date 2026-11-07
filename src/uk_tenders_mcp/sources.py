@@ -57,10 +57,14 @@ async def get_json(
     *,
     params: dict[str, Any] | None = None,
     auth: tuple[str, str] | None = None,
-    retries: int = 3,
+    retries: int = 4,
     backoff: float = 1.0,
 ) -> Any | None:
-    """GET a JSON document. Returns None on 404. Raises SourceError on anything else that fails."""
+    """GET a JSON document. Returns None on 404. Raises SourceError on anything else that fails.
+
+    Rate limits (429) and server errors are retried with exponential backoff, honouring Retry-After
+    when the server sends one, capped at 20 seconds a wait.
+    """
     for attempt in range(retries):
         try:
             response = await client.get(url, params=params, auth=auth, timeout=30)
@@ -72,12 +76,19 @@ async def get_json(
         if response.status_code == 404:
             return None
         if response.status_code in RETRYABLE and attempt < retries - 1:
-            await asyncio.sleep(backoff * 2**attempt)
+            await asyncio.sleep(_retry_delay(response, backoff * 2**attempt))
             continue
         if response.status_code >= 400:
             raise SourceError(f"{url} returned HTTP {response.status_code}")
         return response.json()
     raise SourceError(f"Gave up on {url} after {retries} attempts")
+
+
+def _retry_delay(response: httpx.Response, default: float) -> float:
+    try:
+        return min(20.0, max(0.0, float(response.headers.get("Retry-After", default))))
+    except ValueError:
+        return min(20.0, default)
 
 
 def notice_url(ocid: str) -> str:
@@ -202,6 +213,7 @@ class SourceStatus:
     ok: bool = True
     count: int = 0
     truncated: bool = False
+    missing_days: int = 0  # day slices that failed even after retries; the rest are still returned
     error: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
@@ -217,7 +229,7 @@ class FetchResult:
 async def fetch_contracts_finder(
     client: httpx.AsyncClient, days: int = 7, max_pages: int = 5, page_size: int = 100,
 ) -> tuple[list[Tender], bool]:
-    """Open tenders published on Contracts Finder in the last `days` days. Returns (tenders, truncated)."""
+    """Open tenders published on Contracts Finder in the last `days` days. Returns (tenders, truncated, missing_days)."""
     now = datetime.now(timezone.utc)
     params: dict[str, Any] | None = {
         "publishedFrom": (now - timedelta(days=days)).strftime(_TS),
@@ -238,8 +250,8 @@ async def fetch_contracts_finder(
         url = (data.get("links") or {}).get("next")
         params = None  # the next link already carries its query
         if not url:
-            return tenders, False
-    return tenders, True
+            return tenders, False, 0
+    return tenders, True, 0
 
 
 async def _fts_slice(
@@ -276,7 +288,11 @@ async def fetch_find_a_tender(
         async with gate:
             return await _fts_slice(client, now - timedelta(days=i + 1), now - timedelta(days=i), pages_per_day)
 
-    slices = await asyncio.gather(*(one(i) for i in range(days)))
+    outcomes = await asyncio.gather(*(one(i) for i in range(days)), return_exceptions=True)
+    failed = [o for o in outcomes if isinstance(o, BaseException)]
+    if len(failed) == len(outcomes):
+        raise SourceError(str(failed[0]))
+    slices = [o for o in outcomes if not isinstance(o, BaseException)]
     truncated = any(t for _, t in slices)
 
     latest: dict[str, dict[str, Any]] = {}
@@ -296,7 +312,7 @@ async def fetch_find_a_tender(
                 latest[ocid] = r
 
     tenders = [parse_release(r, FIND_A_TENDER) for ocid, r in latest.items() if ocid not in cancelled]
-    return tenders, truncated
+    return tenders, truncated, len(failed)
 
 
 def _dedupe_key(t: Tender) -> str:
@@ -335,9 +351,9 @@ async def fetch_tenders(
         if isinstance(outcome, BaseException):
             result.sources[source] = SourceStatus(ok=False, error=str(outcome))
             continue
-        tenders, truncated = outcome
+        tenders, truncated, missing = outcome
         batches[source] = tenders
-        result.sources[source] = SourceStatus(count=len(tenders), truncated=truncated)
+        result.sources[source] = SourceStatus(count=len(tenders), truncated=truncated, missing_days=missing)
 
     merged = merge_sources(batches)
     if not include_closed:
@@ -348,7 +364,7 @@ async def fetch_tenders(
 
 async def fetch_recent_tenders(client: httpx.AsyncClient, days: int = 7, **_: Any) -> list[Tender]:
     """Contracts Finder only. Kept for callers of version 0.1."""
-    tenders, _truncated = await fetch_contracts_finder(client, days=days)
+    tenders, _truncated, _missing = await fetch_contracts_finder(client, days=days)
     return tenders
 
 

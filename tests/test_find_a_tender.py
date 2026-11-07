@@ -124,3 +124,17 @@ def test_feasibility_study_without_works_signal_is_no_go():
 def test_keyword_search_is_whole_word(mock_http):
     result = run(server.search_tenders(keywords=["rail"], limit=50))
     assert all("trail" not in t["title"].lower() for t in result["tenders"])
+
+
+def test_buyer_filter_finds_what_else_a_buyer_has_out(mock_http):
+    result = run(server.search_tenders(buyer="example water", limit=50))
+    assert result["tenders"] and all(t["buyer"] == "Example Water Ltd" for t in result["tenders"])
+    assert run(server.search_tenders(buyer="Nobody Council"))["found"] is False
+
+
+def test_some_days_failing_keeps_the_rest_and_says_so(mock_http):
+    mock_http.state["fts_flaky"] = True
+    result = run(server.search_tenders(days=4, limit=50))
+    fts = result["sources"]["Find a Tender"]
+    assert fts["ok"] is True and fts["missing_days"] == 2
+    assert any(t["source"] == "Find a Tender" for t in result["tenders"])

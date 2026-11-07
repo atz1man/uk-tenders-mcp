@@ -15,6 +15,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+import logging
+
 import httpx
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
@@ -34,10 +36,14 @@ server = MCPServer(
     ),
 )
 
+# httpx logs every request at INFO; a week of Find a Tender is ~30 requests of noise on stderr.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 READ_ONLY = ToolAnnotations(read_only_hint=True, open_world_hint=True)
 SOURCES = {"all": (FIND_A_TENDER, CONTRACTS_FINDER), "find_a_tender": (FIND_A_TENDER,),
            "contracts_finder": (CONTRACTS_FINDER,)}
 CACHE_SECONDS = 600
+PARTIAL_CACHE_SECONDS = 60  # a result missing a source or some days is retried sooner
 
 _client: httpx.AsyncClient | None = None
 _cache: dict[tuple[int, tuple[str, ...]], tuple[float, FetchResult]] = {}
@@ -57,8 +63,10 @@ def _clamp(value: int, low: int, high: int) -> int:
 async def _load(days: int, source: str) -> FetchResult:
     key = (days, SOURCES[source])
     hit = _cache.get(key)
-    if hit and time.monotonic() - hit[0] < CACHE_SECONDS:
-        return hit[1]
+    if hit:
+        complete = all(s.ok and not s.missing_days for s in hit[1].sources.values())
+        if time.monotonic() - hit[0] < (CACHE_SECONDS if complete else PARTIAL_CACHE_SECONDS):
+            return hit[1]
     result = await fetch_tenders(client(), days=days, sources=SOURCES[source])
     if any(s.ok for s in result.sources.values()):
         _cache[key] = (time.monotonic(), result)
@@ -83,14 +91,16 @@ async def search_tenders(
     days: int = 7,
     keywords: list[str] | None = None,
     regions: list[str] | None = None,
+    buyer: str | None = None,
     source: Literal["all", "find_a_tender", "contracts_finder"] = "all",
     limit: int = 20,
 ) -> dict[str, Any]:
     """Find open UK public-sector tenders published or updated in the last `days` days (1-30).
 
     Searches Find a Tender and Contracts Finder together, removes notices listed on both, and drops
-    tenders whose deadline has passed. Optional filters: keywords (any match in title or description)
-    and regions (for example ["London", "South East"]). Returns at most `limit` (1-50), soonest
+    tenders whose deadline has passed. Optional filters: keywords (any match in title or description),
+    regions (for example ["London", "South East"]) and buyer (part of the buyer's name, for example
+    "Derbyshire County Council", to see what else a buyer has out). Returns at most `limit` (1-50), soonest
     deadline first, each with buyer, value, deadline, days_left and a source_url to cite.
     """
     days, limit = _clamp(days, 1, 30), _clamp(limit, 1, 50)
@@ -101,6 +111,9 @@ async def search_tenders(
         return {"found": False, "error": "No tender source answered.", "sources": _sources_block(result)}
 
     tenders = [t for t in result.tenders if _in_region(t, regions)]
+    if buyer and buyer.strip():
+        wanted = re.sub(r"\s+", " ", buyer.strip().lower())
+        tenders = [t for t in tenders if t.buyer and wanted in re.sub(r"\s+", " ", t.buyer.lower())]
     if keywords:
         # Whole words, as in scoring: 'rail' must not match 'trail' or 'guardrail'.
         patterns = [re.compile(rf"(?<![a-z]){re.escape(k.lower().strip())}(?![a-z])") for k in keywords if k.strip()]

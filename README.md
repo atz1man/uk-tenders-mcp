@@ -25,7 +25,7 @@ Version 0.1 read Contracts Finder alone and found 21 tenders in 3 days, none of 
 
 | Tool | What it's for | Returns |
 | --- | --- | --- |
-| `search_tenders` | "What tenders are out for bridge works in London this week?" | Open notices from both sources, soonest deadline first, filtered by keyword and region |
+| `search_tenders` | "What tenders are out for bridge works in London this week?" "What else has this buyer got out?" | Open notices from both sources, soonest deadline first, filtered by keyword, region and buyer |
 | `score_tenders` | "Which of this week's tenders are worth bidding for?" | GO and MAYBE first with score, reasons, buyer, value, deadline and days left; NO-GO counted but hidden unless asked |
 | `list_profiles` | "What can you score against?" | Bid profiles and the value range each one bids in |
 | `get_company` | "Is this subcontractor still active? Any insolvency history?" | Status, SIC codes, insolvency history, overdue accounts |
@@ -37,7 +37,7 @@ Every result carries `source_url`, and every tender result says which sources an
 - **Two sources, one list.** Both sites publish OCDS. Notices on both are merged into one record, and the Find a Tender record is kept because it carries more fields. It is marked `also_listed_on: ["Contracts Finder"]`.
 - **Fast despite a slow API.** Find a Tender pages with a cursor, so one long window is about 25 sequential calls a week. The window is split into one-day slices fetched in parallel (4 at a time), which brings a week down from about 40 seconds to about 6. Results are cached for 10 minutes, so a search followed by a score costs one fetch.
 - **Only live tenders.** Find a Tender mixes every notice type: awards, plans, cancellations. Only tender and tender-update notices are kept, the newest release per procurement wins, cancelled procurements are dropped, and so are tenders whose deadline has passed.
-- **Partial results say so.** If one source fails, the other still answers and the result says which one failed, so the agent can tell the user the list may be incomplete.
+- **Partial results say so.** If one source fails, the other still answers and the result says which one failed. Find a Tender rate-limits heavy use (HTTP 429), so requests back off and retry, honouring `Retry-After`; if some day slices still fail, the days that answered are kept and the result reports `missing_days`. A partial result is cached for 1 minute rather than 10, so the next call tries again.
 - **Task-shaped, read-only and capped.** Four tools that match what people ask. `days` and `limit` are clamped, and descriptions are trimmed, so one call cannot flood the model's context.
 - **Grounded by design.** A missing company returns `found: false` rather than a guess. The server tells the agent to cite sources and never fill gaps from memory.
 - **Explainable scoring.** Rules, not a black box: keywords, anchor terms, exclusions, works CPV codes, the buyer's own works/services/goods label, value range, SME suitability and time left to bid. Every verdict lists its reasons.
@@ -97,7 +97,7 @@ The next step is labels from real bid and pass decisions, with this rules versio
 git clone https://github.com/atz1man/uk-tenders-mcp
 cd uk-tenders-mcp
 uv sync --extra dev              # or: pip install -e ".[dev]"
-uv run pytest                    # 32 tests, no network needed
+uv run pytest                    # 34 tests, no network needed
 uv run python eval/run_eval.py   # scoring evaluation
 ```
 
@@ -129,7 +129,7 @@ src/uk_tenders_mcp/
   sources.py    Find a Tender and Contracts Finder (OCDS), merging, Companies House
   scoring.py    bid profiles and GO / MAYBE / NO-GO rules
   models.py     typed records (Pydantic)
-tests/          32 tests, all offline via a mocked HTTP transport
+tests/          34 tests, all offline via a mocked HTTP transport
 eval/           labelled set (including real notices) and evaluation script
 .github/        CI: tests and evaluation on every push
 ```
